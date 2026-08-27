@@ -8,15 +8,19 @@ import java.nio.charset.StandardCharsets;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.convert.converter.Converter;
+import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
@@ -43,6 +47,7 @@ public class SecurityConfig {
                 .httpBasic(basic -> basic.disable())
 
                 .authorizeHttpRequests(auth -> auth
+
                         // Authentication endpoints are public
                         .requestMatchers("/api/v1/auth/**")
                         .permitAll()
@@ -52,19 +57,62 @@ public class SecurityConfig {
                         .authenticated()
                 )
 
-                // Validate JWT from:
-                // Authorization: Bearer <token>
+                // JWT authentication
                 .oauth2ResourceServer(oauth2 ->
-                        oauth2.jwt(jwt -> {})
+                        oauth2.jwt(jwt ->
+                                jwt.jwtAuthenticationConverter(
+                                        jwtAuthenticationConverter()
+                                )
+                        )
                 );
 
         return http.build();
     }
 
+    // =========================================================
+    // JWT AUTHENTICATION CONVERTER
+    // =========================================================
+
+    @Bean
+    public Converter<Jwt, ? extends AbstractAuthenticationToken>
+    jwtAuthenticationConverter() {
+
+        JwtAuthenticationConverter converter =
+                new JwtAuthenticationConverter();
+
+        /*
+         * By default Spring Security uses the "sub" claim
+         * as authentication.getName().
+         *
+         * Our JWT contains:
+         *
+         * "sub": "john@gmail.com"
+         * "userId": 4
+         *
+         * We want authentication.getName() to return:
+         *
+         * "4"
+         *
+         * so that UserController can obtain the user ID.
+         */
+        converter.setPrincipalClaimName("userId");
+
+        return converter;
+    }
+
+    // =========================================================
+    // PASSWORD ENCODER
+    // =========================================================
+
     @Bean
     public PasswordEncoder passwordEncoder() {
+
         return new BCryptPasswordEncoder();
     }
+
+    // =========================================================
+    // JWT ENCODER
+    // =========================================================
 
     @Bean
     public JwtEncoder jwtEncoder() {
@@ -76,6 +124,10 @@ public class SecurityConfig {
                 new ImmutableSecret<>(secretBytes)
         );
     }
+
+    // =========================================================
+    // JWT DECODER
+    // =========================================================
 
     @Bean
     public JwtDecoder jwtDecoder() {

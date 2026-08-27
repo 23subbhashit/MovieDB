@@ -23,10 +23,19 @@ public class JwtService {
         Instant now = Instant.now();
 
         JwtClaimsSet claims = JwtClaimsSet.builder()
+
+                // User email
                 .subject(email)
+
+                // User ID
                 .claim("userId", userId)
+
+                // Token creation time
                 .issuedAt(now)
+
+                // Token expires after 1 hour
                 .expiresAt(now.plusSeconds(3600))
+
                 .build();
 
         return jwtEncoder.encode(
